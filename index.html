@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>GPS DETECTOR - ALARM MP3 LANGSUNG</title>
+<style>
+  :root {
+    --red: #ff2020;
+    --yellow: #ffcc00;
+    --green: #00ff88;
+    --cyan: #00eeff;
+    --dark: #04080e;
+    --panel: #080f1a;
+    --border: #152a3a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    background: var(--dark);
+    color: var(--cyan);
+    min-height: 100vh;
+  }
+  body::before {
+    content:'';
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,238,255,0.025) 3px, rgba(0,238,255,0.025) 4px);
+    pointer-events:none;
+    z-index:9999;
+  }
+  .scanline {
+    position:fixed;
+    top:-120px; left:0; right:0;
+    height:120px;
+    background: linear-gradient(transparent, rgba(0,238,255,0.06), transparent);
+    animation: scan 5s linear infinite;
+    pointer-events:none;
+    z-index:9998;
+  }
+  @keyframes scan { to { top:110vh; } }
+  header {
+    text-align:center;
+    padding:14px 10px 8px;
+    border-bottom:1px solid var(--border);
+    background: linear-gradient(180deg,#050d18,#04080e);
+  }
+  header h1 {
+    font-size:clamp(0.9rem,4.5vw,1.4rem);
+    font-weight:900;
+    letter-spacing:5px;
+    text-transform:uppercase;
+    text-shadow:0 0 18px var(--cyan),0 0 35px rgba(0,238,255,0.4);
+  }
+  header .sub { font-size:0.58rem; color:#2a6a8a; letter-spacing:3px; margin-top:3px; }
+  .tabs { display:flex; background:#040c14; border-bottom:2px solid var(--border); }
+  .tab-btn {
+    flex:1; padding:11px 4px;
+    background:none; border:none; border-bottom:3px solid transparent;
+    color:#2a5a7a; font-family:'Courier New',monospace;
+    font-size:clamp(0.52rem,2.2vw,0.7rem); font-weight:700;
+    letter-spacing:1px; cursor:pointer; transition:all 0.25s;
+  }
+  .tab-btn.active {
+    color:var(--cyan); border-bottom-color:var(--cyan);
+    background:rgba(0,238,255,0.05); text-shadow:0 0 8px var(--cyan);
+  }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  .snd-btn {
+    position:fixed; top:10px; right:10px; z-index:1000;
+    background:rgba(0,238,255,0.08); border:1px solid var(--border);
+    color:var(--cyan); font-size:1.1rem; width:34px; height:34px;
+    border-radius:3px; cursor:pointer;
+  }
+  #flashOv {
+    position:fixed; top:0;left:0;right:0;bottom:0;
+    pointer-events:none; opacity:0; z-index:9997;
+    background:rgba(255,20,20,0.2);
+    transition:opacity 0.08s;
+  }
+  #flashOv.on { opacity:1; }
+  .gps-panel { padding:12px 10px; display:flex; flex-direction:column; gap:12px; }
+  .perm-note {
+    background:rgba(255,204,0,0.07);
+    border:1px solid rgba(255,204,0,0.25);
+    border-radius:3px;
+    padding:9px 11px;
+    font-size:0.58rem;
+    color:#ccaa00;
+  }
+  .ring-wrap { display:flex; justify-content:center; padding:6px 0; }
+  .ring-outer { position:relative; width:170px; height:170px; }
+  .ring-outer svg { position:absolute; top:0;left:0; width:100%; height:100%; transform:rotate(-90deg); }
+  .ring-track { fill:none; stroke:#091a26; stroke-width:12; }
+  .ring-fill {
+    fill:none; stroke:var(--green); stroke-width:12;
+    stroke-linecap:round; stroke-dasharray:489; stroke-dashoffset:489;
+    transition:stroke-dashoffset 0.9s, stroke 0.4s;
+  }
+  .ring-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+  .ring-val { font-size:2.1rem; font-weight:900; color:var(--green); text-shadow:0 0 18px currentColor; line-height:1; }
+  .ring-unit { font-size:0.55rem; color:#2a6a8a; letter-spacing:2px; }
+  .ring-st { font-size:0.52rem; letter-spacing:2px; margin-top:5px; font-weight:700; }
+  .sig-bars { display:flex; gap:5px; align-items:flex-end; justify-content:center; height:38px; }
+  .bar { width:16px; border-radius:2px 2px 0 0; background:#081520; transition:background 0.4s; }
+  .bar.g { background:var(--green); box-shadow:0 0 7px var(--green); }
+  .bar.y { background:var(--yellow); box-shadow:0 0 7px var(--yellow); }
+  .bar.r { background:var(--red); box-shadow:0 0 7px var(--red); }
+  .igrid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .icard { background:var(--panel); border:1px solid var(--border); border-radius:3px; padding:9px 10px; }
+  .icard .lbl { font-size:0.5rem; color:#2a6070; letter-spacing:2px; margin-bottom:3px; text-transform:uppercase; }
+  .icard .val { font-size:clamp(0.65rem,2.5vw,0.85rem); font-weight:700; color:var(--cyan); }
+  .icard.full { grid-column:span 2; }
+  .btn {
+    width:100%; padding:13px; border-radius:3px; cursor:pointer;
+    font-family:'Courier New',monospace; font-weight:700;
+    font-size:clamp(0.65rem,2.8vw,0.8rem); letter-spacing:3px;
+    text-transform:uppercase; transition:all 0.25s; border:2px solid;
+  }
+  .btn-cyan { background:linear-gradient(135deg,#001e2e,#003344); border-color:var(--cyan); color:var(--cyan); }
+  .btn-red  { background:linear-gradient(135deg,#1a000a,#330011); border-color:var(--red); color:var(--red); }
+  .btn-grn  { background:linear-gradient(135deg,#001a0a,#003315); border-color:var(--green); color:var(--green); }
+  .btn-blue { background:linear-gradient(135deg,#00071a,#001133); border-color:#0088ff; color:#0088ff; }
+  .alert { display:none; padding:11px; border-radius:3px; font-size:0.65rem; text-align:center; font-weight:700; }
+  .alert.show { display:block; }
+  .alert.w { background:rgba(255,204,0,0.1); border:2px solid var(--yellow); color:var(--yellow); animation:pulseY 0.6s infinite alternate; }
+  .alert.d { background:rgba(255,20,20,0.14); border:2px solid var(--red); color:var(--red); animation:pulseR 0.4s infinite alternate; }
+  @keyframes pulseY { to { border-color:transparent; } }
+  @keyframes pulseR { to { border-color:transparent; box-shadow:0 0 20px var(--red); } }
+  .mp3-panel {
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:10px;
+    margin-bottom:8px;
+  }
+  .mp3-panel .title { font-size:0.65rem; font-weight:bold; color:var(--yellow); margin-bottom:6px; }
+  .mp3-upload { width:100%; padding:6px; background:#030a10; border:1px solid var(--border); color:var(--cyan); font-size:0.6rem; margin-top:4px; cursor:pointer; }
+  .mp3-status { font-size:0.55rem; color:#2a8a6a; margin-top:6px; font-weight:bold; }
+  .loglost-panel {
+    background:var(--panel);
+    border:2px solid var(--border);
+    border-radius:3px;
+    margin-top:8px;
+    padding:9px;
+  }
+  .loglost-panel .title {
+    font-size:0.65rem;
+    font-weight:900;
+    letter-spacing:2px;
+    color:var(--yellow);
+    border-bottom:1px solid var(--border);
+    padding-bottom:5px;
+    margin-bottom:7px;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    flex-wrap:wrap;
+    justify-content:space-between;
+  }
+  #lostLogList { max-height:130px; overflow-y:auto; font-size:0.52rem; }
+  .lost-entry {
+    border-left:3px solid var(--red);
+    padding:6px 5px;
+    margin-bottom:6px;
+    background:rgba(255,0,0,0.05);
+    border-radius:0 3px 3px 0;
+  }
+  .lost-time { color:var(--yellow); font-weight:bold; }
+  .lost-dur { color:var(--cyan); }
+  .lost-coord { color:#88aaff; }
+  .clear-btn { background:none; border:1px solid var(--border); color:#ff8866; font-size:0.5rem; padding:4px 8px; cursor:pointer; border-radius:3px; }
+  .maps-panel, .map3-panel { padding:10px; display:flex; flex-direction:column; gap:10px; }
+  .coord-row { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .cbox { background:var(--panel); border:1px solid var(--border); border-radius:3px; padding:9px; }
+  .cbox .lbl { font-size:0.5rem; color:#2a6070; letter-spacing:2px; }
+  .cbox .val { font-size:0.75rem; font-weight:700; color:var(--green); }
+  #mapWrap { position:relative; width:100%; height:320px; border:2px solid var(--border); border-radius:3px; overflow:hidden; background:#030a10; }
+  #mapWrap iframe { width:100%; height:100%; border:none; }
+  .logbox { background:#020810; border:1px solid var(--border); border-radius:3px; padding:8px; height:90px; overflow-y:auto; font-size:0.58rem; color:#2a7a5a; }
+  .le { display:flex; gap:7px; }
+  .lt { color:#1a4a3a; }
+  .ok { color:var(--green); } .wn { color:var(--yellow); } .er { color:var(--red); } .if { color:var(--cyan); }
+  .map3-grid { display:grid; gap:8px; }
+  .map3-grid.split2 { grid-template-columns:1fr 1fr; }
+  .map3-grid.split3 { grid-template-columns:1fr 1fr 1fr; }
+  .mframe-wrap { position:relative; border-radius:3px; overflow:hidden; border:2px solid var(--border); background:#030a10; }
+  .mframe-label { position:absolute; top:6px; left:6px; z-index:10; background:rgba(4,8,14,0.88); border:1px solid var(--border); border-radius:2px; padding:3px 7px; font-size:0.5rem; color:var(--cyan); }
+  .mframe-ph { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#1a4060; padding:14px; }
+  .view-row { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .vbtn { padding:8px 4px; border-radius:3px; cursor:pointer; font-size:0.58rem; font-weight:700; text-align:center; border:1px solid var(--border); background:var(--panel); color:#3a6a8a; }
+  .vbtn.active { border-color:var(--cyan); color:var(--cyan); background:rgba(0,238,255,0.07); }
+  .m3-info { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+  .m3-ibox { background:var(--panel); border:1px solid var(--border); border-radius:3px; padding:7px; text-align:center; }
+  .m3-ibox .lbl { font-size:0.48rem; color:#2a5060; }
+  .m3-ibox .val { font-size:0.68rem; font-weight:700; color:var(--cyan); }
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+<div id="flashOv"></div>
+<button class="snd-btn" id="sndBtn">🔊</button>
+<header>
+  <h1>⚡ GPS WEAK DETECTOR PRO</h1>
+  <div class="sub">ALARM LANGSUNG · SEMUA FILE MP3 BISA · TERSIMPAN</div>
+</header>
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('gps',this)">📡 GPS RADAR</button>
+  <button class="tab-btn" onclick="switchTab('maps',this)">🗺️ MAPS</button>
+  <button class="tab-btn" onclick="switchTab('map3',this)">🛰️ 3 PETA</button>
+</div>
+
+<div id="tab-gps" class="tab-content active">
+<div class="gps-panel">
+  <div class="perm-note">⚠️ <strong style="color:#ffaa00">WAJIB UPLOAD MP3!</strong> Alarm langsung berbunyi saat GPS lemah (akurasi > 50m). <strong>Semua file MP3 bisa dipilih, tidak ada validasi ketat.</strong> Data tersimpan walau refresh.</div>
+
+  <div class="mp3-panel">
+    <div class="title">🎵 CUSTOM MP3 ALARM (SEMUA MP3 BISA)</div>
+    <input type="file" id="mp3FileInput" accept="audio/*,.mp3,.mpeg" class="mp3-upload">
+    <div id="mp3Status" class="mp3-status">⚡ Pilih file MP3 Anda (bebas, semua bisa)</div>
+  </div>
+
+  <div id="alertBanner" class="alert"></div>
+  <div class="ring-wrap"><div class="ring-outer"><svg viewBox="0 0 170 170"><circle class="ring-track" cx="85" cy="85" r="78"/><circle class="ring-fill" id="ringFill" cx="85" cy="85" r="78"/></svg><div class="ring-center"><div class="ring-val" id="rVal">--</div><div class="ring-unit">AKURASI (m)</div><div class="ring-st" id="rSt">STANDBY</div></div></div></div>
+  <div class="sig-bars"><div class="bar" id="b1" style="height:9px"></div><div class="bar" id="b2" style="height:17px"></div><div class="bar" id="b3" style="height:25px"></div><div class="bar" id="b4" style="height:32px"></div><div class="bar" id="b5" style="height:38px"></div></div>
+  <div class="igrid">
+    <div class="icard"><div class="lbl">LATITUDE</div><div class="val" id="dLat">--</div></div>
+    <div class="icard"><div class="lbl">LONGITUDE</div><div class="val" id="dLng">--</div></div>
+    <div class="icard"><div class="lbl">AKURASI</div><div class="val" id="dAcc">-- m</div></div>
+    <div class="icard"><div class="lbl">STATUS</div><div class="val" id="dSt">OFFLINE</div></div>
+    <div class="icard full"><div class="lbl">KOORDINAT LENGKAP</div><div class="val" id="dFull">Belum aktif</div></div>
+  </div>
+
+  <div class="loglost-panel">
+    <div class="title"><span>📋 LOG KEJADIAN GPS LEMAH / HILANG</span> <button class="clear-btn" onclick="clearLostLog()">🗑 HAPUS LOG</button><button class="clear-btn" onclick="exportTXTLog()" style="margin-left:5px;">💾 SAVE TXT</button></div>
+    <div id="lostLogList"><div style="color:#2a4a5a; text-align:center; padding:10px;">Memuat data tersimpan...</div></div>
+  </div>
+
+  <button class="btn btn-cyan" id="btnOn" onclick="startGPS()">▶ AKTIFKAN GPS</button>
+  <button class="btn btn-red" id="btnOff" onclick="stopGPS()" style="display:none">■ HENTIKAN GPS</button>
+  <div class="logbox" id="log1"></div>
+</div>
+</div>
+
+<div id="tab-maps" class="tab-content"><div class="maps-panel"><div class="coord-row"><div class="cbox"><div class="lbl">LATITUDE</div><div class="val" id="mLat">--</div></div><div class="cbox"><div class="lbl">LONGITUDE</div><div class="val" id="mLng">--</div></div></div><div id="mapWrap"><div id="mapPH"><div style="font-size:2.8rem">🗺️</div><div>AKTIFKAN GPS</div></div><iframe id="mapFr" style="display:none" allowfullscreen loading="lazy"></iframe></div><button class="btn btn-grn" onclick="openMapsApp()">📍 BUKA GOOGLE MAPS APP</button><button class="btn btn-blue" onclick="openMapsWeb()">🌐 BUKA DI CHROME</button><div class="logbox" id="log2"></div></div></div>
+
+<div id="tab-map3" class="tab-content"><div class="map3-panel"><div class="m3-info"><div class="m3-ibox"><div class="lbl">LAT</div><div class="val" id="m3Lat">--</div></div><div class="m3-ibox"><div class="lbl">LNG</div><div class="val" id="m3Lng">--</div></div><div class="m3-ibox"><div class="lbl">AKURASI</div><div class="val" id="m3Acc">--</div></div></div><div class="view-row"><button class="vbtn" onclick="setView(1,this)">▣ SATU</button><button class="vbtn active" onclick="setView(2,this)">▣▣ DUA</button><button class="vbtn" onclick="setView(3,this)">▣▣▣ TIGA</button></div><div class="map3-grid split2" id="m3Grid"><div class="mframe-wrap" id="mw1"><div class="mframe-label">🗺 GOOGLE</div><div class="mframe-ph" id="mph1"><div>🗺️</div></div><iframe id="mfr1" style="display:none;height:220px" allowfullscreen loading="lazy"></iframe></div><div class="mframe-wrap" id="mw2"><div class="mframe-label">🌿 OSM</div><div class="mframe-ph" id="mph2"><div>🌿</div></div><iframe id="mfr2" style="display:none;height:220px" allowfullscreen loading="lazy"></iframe></div><div class="mframe-wrap" id="mw3" style="display:none"><div class="mframe-label">🛰 SAT</div><div class="mframe-ph" id="mph3"><div>🛰️</div></div><iframe id="mfr3" style="display:none;height:220px" allowfullscreen loading="lazy"></iframe></div></div><button class="btn btn-grn" onclick="openMapsApp()" style="font-size:0.6rem;">📍 MAPS APP</button><div class="logbox" id="log3"></div></div></div>
+
+<script>
+// ======================== PERSISTENSI DATA (localStorage) ========================
+let lostEvents = [];
+let customMP3Base64 = null;
+let customMP3BlobURL = null;
+let useCustomMP3 = false;
+let soundOn = true;
+
+function loadPersistedData() {
+  try {
+    const savedEvents = localStorage.getItem('gps_lost_events_instant');
+    if (savedEvents) lostEvents = JSON.parse(savedEvents);
+    const savedMP3 = localStorage.getItem('gps_mp3_base64_instant');
+    if (savedMP3 && savedMP3 !== 'null' && savedMP3 !== 'undefined') {
+      customMP3Base64 = savedMP3;
+      customMP3BlobURL = base64ToBlobURL(savedMP3);
+      useCustomMP3 = true;
+      document.getElementById('mp3Status').innerHTML = '✅ MP3 TERSIMPAN, siap diputar langsung saat GPS lemah.';
+      document.getElementById('mp3Status').style.color = '#88ff88';
+    }
+    const savedSound = localStorage.getItem('gps_sound_on_instant');
+    if (savedSound !== null) soundOn = savedSound === 'true';
+    document.getElementById('sndBtn').textContent = soundOn ? '🔊' : '🔇';
+  } catch(e) { console.log(e); }
+}
+
+function persistLostEvents() { localStorage.setItem('gps_lost_events_instant', JSON.stringify(lostEvents)); }
+
+function base64ToBlobURL(base64) {
+  try {
+    const binary = atob(base64.split(',')[1]);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+    const blob = new Blob([array], { type: 'audio/mpeg' });
+    return URL.createObjectURL(blob);
+  } catch(e) { return null; }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// PERBAIKAN UTAMA: Semua file diterima, tidak ada validasi MIME type
+document.getElementById('mp3FileInput').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  // Tidak ada validasi! Semua file diterima
+  lg1('if', `Memproses file: ${file.name} (${(file.size/1024).toFixed(1)} KB)`);
+  document.getElementById('mp3Status').innerHTML = `⏳ Memproses ${file.name}...`;
+  document.getElementById('mp3Status').style.color = '#ffaa00';
+  
+  try {
+    const base64 = await fileToBase64(file);
+    customMP3Base64 = base64;
+    localStorage.setItem('gps_mp3_base64_instant', base64);
+    if (customMP3BlobURL) URL.revokeObjectURL(customMP3BlobURL);
+    customMP3BlobURL = base64ToBlobURL(base64);
+    useCustomMP3 = true;
+    
+    // Test play untuk memastikan file bisa diputar
+    const testAudio = new Audio(customMP3BlobURL);
+    testAudio.volume = 0.3;
+    testAudio.play().then(() => {
+      testAudio.pause();
+      testAudio.currentTime = 0;
+      document.getElementById('mp3Status').innerHTML = `✅ MP3 "${file.name}" BERHASIL! Alarm siap.`;
+      document.getElementById('mp3Status').style.color = '#88ff88';
+      lg1('ok', `MP3 berhasil dimuat: ${file.name}`);
+    }).catch(err => {
+      document.getElementById('mp3Status').innerHTML = `⚠️ MP3 "${file.name}" tersimpan tapi gagal test play (mungkin format tidak didukung browser). Coba file lain.`;
+      document.getElementById('mp3Status').style.color = '#ff8888';
+      lg1('er', `Test play gagal: ${err.message}`);
+    });
+    
+    // Jika alarm sedang aktif, restart
+    if (alarmActive) { stopAlarmMP3(); startAlarmMP3(); }
+  } catch(err) {
+    lg1('er', 'Gagal memproses file: ' + err.message);
+    document.getElementById('mp3Status').innerHTML = '❌ Gagal memproses file. Coba file MP3 lain.';
+    document.getElementById('mp3Status').style.color = '#ff8888';
+  }
+});
+
+// ======================== ALARM MP3 ENGINE ========================
+let currentAlarmAudio = null;
+let alarmActive = false;
+
+function startAlarmMP3() {
+  if (!soundOn) return;
+  if (alarmActive) return;
+  if (!useCustomMP3 || !customMP3BlobURL) {
+    lg1('er', '⚠️ ALARM TIDAK BUNYI: Upload MP3 dulu!');
+    document.getElementById('mp3Status').innerHTML = '❌ Upload MP3 dulu agar alarm berbunyi!';
+    document.getElementById('mp3Status').style.color = '#ff8888';
+    return;
+  }
+  stopAlarmMP3();
+  try {
+    const audio = new Audio(customMP3BlobURL);
+    audio.loop = true;
+    audio.volume = 1.0;
+    audio.addEventListener('ended', function onEnded() {
+      if (alarmActive && soundOn && currentAlarmAudio === audio) {
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log('repeat error'));
+      }
+    });
+    audio.play().then(() => {
+      currentAlarmAudio = audio;
+      alarmActive = true;
+      lg1('er', '🔊 ALARM MP3 BERBUNYI (LOOP)');
+      flashEffect();
+    }).catch(err => {
+      lg1('er', 'Gagal play MP3: ' + err.message);
+      document.getElementById('mp3Status').innerHTML = `⚠️ Gagal play MP3: ${err.message}. Coba file lain.`;
+    });
+  } catch(e) { lg1('er', 'Error play MP3: ' + e.message); }
+}
+
+function stopAlarmMP3() {
+  if (currentAlarmAudio) {
+    currentAlarmAudio.pause();
+    currentAlarmAudio.currentTime = 0;
+    currentAlarmAudio = null;
+  }
+  alarmActive = false;
+}
+
+function flashEffect() { const f = document.getElementById('flashOv'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 150); }
+
+// ======================== GPS & LOG ========================
+let watchId = null;
+let lastKnownLat = null, lastKnownLng = null, lastKnownAcc = null;
+let lastPosTime = 0;
+let currentWeakState = false;
+let lastLoggedEventId = null;
+
+function addLostEvent(lat, lng, acc, statusText) {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const entry = {
+    id: Date.now(),
+    time: timeStr,
+    fullDate: now.toLocaleString('id-ID'),
+    lat: lat, lng: lng, acc: acc,
+    status: statusText
+  };
+  lostEvents.unshift(entry);
+  if (lostEvents.length > 30) lostEvents.pop();
+  persistLostEvents();
+  renderLostLog();
+  lg1('er', `📝 LOG: ${statusText} di (${lat.toFixed(5)}, ${lng.toFixed(5)}) akurasi ${Math.round(acc)}m`);
+}
+
+function renderLostLog() {
+  const container = document.getElementById('lostLogList');
+  if (!container) return;
+  if (lostEvents.length === 0) {
+    container.innerHTML = '<div style="color:#2a4a5a; text-align:center; padding:10px;">Belum ada kejadian (GPS lemah akan langsung tercatat)</div>';
+    return;
+  }
+  let html = '';
+  for (let e of lostEvents) {
+    html += `<div class="lost-entry">
+      <div><span class="lost-time">⏱️ ${e.time}</span> <span class="lost-dur">📡 ${e.status}</span></div>
+      <div class="lost-coord">📍 ${e.lat.toFixed(6)}, ${e.lng.toFixed(6)} (akurasi ${Math.round(e.acc)}m)</div>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function clearLostLog() { lostEvents = []; persistLostEvents(); renderLostLog(); lg1('if', 'Log dihapus'); }
+
+function exportTXTLog() {
+  if (lostEvents.length === 0) { alert('Tidak ada data log.'); return; }
+  let content = "=== GPS WEAK/SIGNAL LOST LOG ===\n";
+  content += `Tanggal Ekspor: ${new Date().toLocaleString()}\n`;
+  content += "===================================\n\n";
+  for (let e of lostEvents) {
+    content += `[${e.time}] ${e.status}\n`;
+    content += `Lokasi: ${e.lat}, ${e.lng} (akurasi ${Math.round(e.acc)}m)\n`;
+    content += `Waktu: ${e.fullDate}\n`;
+    content += "-----------------------------------\n";
+  }
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `gps_log_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  lg1('ok', 'File TXT berhasil disimpan');
+}
+
+function updateSignalInstant(acc, lat, lng) {
+  if (lat && lng) { lastKnownLat = lat; lastKnownLng = lng; lastKnownAcc = acc; }
+  
+  const isWeak = (acc > 50);
+  const isCritical = (acc > 150);
+  const shouldAlarm = isWeak || isCritical;
+  
+  // Update alarm MP3
+  if (shouldAlarm && soundOn && !alarmActive && useCustomMP3) {
+    startAlarmMP3();
+  } else if (!shouldAlarm && alarmActive) {
+    stopAlarmMP3();
+  }
+  
+  // Logging setiap 30 detik jika masih lemah
+  const nowId = Math.floor(Date.now() / 30000);
+  if (shouldAlarm && lastLoggedEventId !== nowId) {
+    lastLoggedEventId = nowId;
+    let statusText = isCritical ? '✖ SINYAL SANGAT LEMAH/HILANG (ALARM AKTIF)' : '⚠ SINYAL LEMAH (ALARM AKTIF)';
+    addLostEvent(lat, lng, acc, statusText);
+  } else if (!shouldAlarm && currentWeakState) {
+    if (lastLoggedEventId !== 'normal') {
+      lastLoggedEventId = 'normal';
+      addLostEvent(lat, lng, acc, '✔ SINYAL NORMAL (ALARM BERHENTI)');
+    }
+  }
+  
+  currentWeakState = shouldAlarm;
+  if (!shouldAlarm) lastLoggedEventId = null;
+  
+  // UI Banner
+  const bn = document.getElementById('alertBanner');
+  const ds = document.getElementById('dSt');
+  if (isCritical) {
+    bn.className = 'alert d show';
+    bn.textContent = '✖ GPS SANGAT LEMAH / HILANG → ALARM MP3 AKTIF!';
+    ds.textContent = '✖ KRITIS/HILANG';
+    ds.style.color = 'var(--red)';
+  } else if (isWeak) {
+    bn.className = 'alert w show';
+    bn.textContent = '⚠ GPS LEMAH → ALARM MP3 AKTIF!';
+    ds.textContent = '⚠ LEMAH';
+    ds.style.color = 'var(--yellow)';
+  } else {
+    bn.className = 'alert';
+    ds.textContent = '✔ SINYAL KUAT';
+    ds.style.color = 'var(--green)';
+  }
+}
+
+let lostTotalInterval = null;
+function monitorTotalLost() {
+  if (!watchId) return;
+  const now = Date.now();
+  if (now - lastPosTime > 5000 && !currentWeakState && lastKnownLat) {
+    if (!alarmActive && soundOn && useCustomMP3) startAlarmMP3();
+    if (!currentWeakState) {
+      currentWeakState = true;
+      const nowId = Math.floor(Date.now() / 30000);
+      if (lastLoggedEventId !== nowId) {
+        lastLoggedEventId = nowId;
+        addLostEvent(lastKnownLat, lastKnownLng, lastKnownAcc || 0, '📡 SINYAL GPS HILANG TOTAL (ALARM AKTIF)');
+      }
+    }
+    const bn = document.getElementById('alertBanner');
+    bn.className = 'alert d show';
+    bn.textContent = '📡 SINYAL GPS HILANG TOTAL → ALARM MP3 AKTIF!';
+    document.getElementById('dSt').textContent = 'HILANG';
+    document.getElementById('dSt').style.color = 'var(--red)';
+  } else if (now - lastPosTime <= 5000 && currentWeakState && lastKnownAcc && lastKnownAcc <= 50) {
+    if (alarmActive) stopAlarmMP3();
+    currentWeakState = false;
+    lastLoggedEventId = null;
+  }
+}
+
+function onPos(p) {
+  const lat = p.coords.latitude, lng = p.coords.longitude, acc = p.coords.accuracy;
+  lastPosTime = Date.now();
+  lastKnownLat = lat; lastKnownLng = lng; lastKnownAcc = acc;
+  
+  document.getElementById('dLat').textContent = lat.toFixed(7);
+  document.getElementById('dLng').textContent = lng.toFixed(7);
+  document.getElementById('dAcc').textContent = acc.toFixed(1) + ' m';
+  document.getElementById('dFull').textContent = lat.toFixed(7) + ', ' + lng.toFixed(7);
+  document.getElementById('mLat').textContent = lat.toFixed(7);
+  document.getElementById('mLng').textContent = lng.toFixed(7);
+  document.getElementById('m3Lat').textContent = lat.toFixed(6);
+  document.getElementById('m3Lng').textContent = lng.toFixed(6);
+  document.getElementById('m3Acc').textContent = acc.toFixed(0) + 'm';
+  
+  updateRing(acc);
+  updateBars(acc);
+  updateMap(lat, lng, acc);
+  updateMap3(lat, lng, acc);
+  updateSignalInstant(acc, lat, lng);
+}
+
+function onErr(e) {
+  lg1('er', `Error GPS: ${e.message || 'Izin ditolak'}`);
+  if (!lastPosTime || Date.now() - lastPosTime > 4000) {
+    if (!alarmActive && soundOn && useCustomMP3) startAlarmMP3();
+  }
+}
+
+function startGPS() {
+  if (!navigator.geolocation) { lg1('er', 'No Geolocation'); return; }
+  if (watchId) stopGPS();
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, {
+    enableHighAccuracy: true,
+    timeout: 12000,
+    maximumAge: 0
+  });
+  document.getElementById('btnOn').style.display = 'none';
+  document.getElementById('btnOff').style.display = 'block';
+  if (lostTotalInterval) clearInterval(lostTotalInterval);
+  lostTotalInterval = setInterval(monitorTotalLost, 2000);
+  lg1('if', 'GPS Aktif - Alarm langsung saat lemah');
+}
+
+function stopGPS() {
+  if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (lostTotalInterval) { clearInterval(lostTotalInterval); lostTotalInterval = null; }
+  stopAlarmMP3();
+  currentWeakState = false;
+  lastLoggedEventId = null;
+  document.getElementById('btnOn').style.display = 'block';
+  document.getElementById('btnOff').style.display = 'none';
+  document.getElementById('rVal').textContent = '--';
+  document.getElementById('rSt').textContent = 'OFFLINE';
+  document.getElementById('dSt').textContent = 'OFFLINE';
+  document.getElementById('alertBanner').className = 'alert';
+  resetBars();
+  lg1('wn', 'GPS dihentikan');
+}
+
+function updateRing(acc) {
+  const pct = Math.max(0, 1 - Math.min(acc, 500) / 500);
+  document.getElementById('ringFill').style.strokeDashoffset = 489 - 489 * pct;
+  document.getElementById('rVal').textContent = acc < 1000 ? Math.round(acc) : '>999';
+  let col = acc <= 50 ? 'var(--green)' : acc <= 150 ? 'var(--yellow)' : 'var(--red)';
+  let st = acc <= 50 ? '✔ KUAT' : acc <= 150 ? '⚠ LEMAH' : '✖ SANGAT LEMAH';
+  document.getElementById('ringFill').style.stroke = col;
+  document.getElementById('rVal').style.color = col;
+  document.getElementById('rSt').style.color = col;
+  document.getElementById('rSt').textContent = st;
+}
+
+function updateBars(acc) {
+  const lv = acc <= 12 ? 5 : acc <= 25 ? 4 : acc <= 55 ? 3 : acc <= 110 ? 2 : acc <= 200 ? 1 : 0;
+  for (let i = 1; i <= 5; i++) {
+    const b = document.getElementById('b' + i);
+    b.style.height = [9, 17, 25, 32, 38][i - 1] + 'px';
+    b.className = 'bar';
+    if (i - 1 < lv) b.classList.add(lv >= 4 ? 'g' : lv >= 2 ? 'y' : 'r');
+  }
+}
+
+function resetBars() { for (let i = 1; i <= 5; i++) document.getElementById('b' + i).className = 'bar'; }
+
+function updateMap(lat, lng, acc) {
+  const z = acc <= 20 ? 18 : acc <= 60 ? 16 : 14;
+  const url = `https://maps.google.com/maps?q=${lat},${lng}&z=${z}&output=embed`;
+  const fr = document.getElementById('mapFr'), ph = document.getElementById('mapPH');
+  fr.src = url; fr.style.display = 'block'; ph.style.display = 'none';
+}
+
+function openMapsApp() { if (lastKnownLat) window.open(`https://maps.google.com/?q=${lastKnownLat},${lastKnownLng}`, '_blank'); else lg2('er', 'GPS belum aktif'); }
+function openMapsWeb() { if (lastKnownLat) window.open(`https://www.google.com/maps/search/?api=1&query=${lastKnownLat},${lastKnownLng}`, '_blank'); }
+
+let m3Urls = ['', '', ''];
+function updateMap3(lat, lng, acc) {
+  const z = acc <= 20 ? 17 : acc <= 60 ? 15 : 13;
+  const delta = 0.008 / Math.pow(2, z - 13);
+  const u1 = `https://maps.google.com/maps?q=${lat},${lng}&z=${z}&output=embed`;
+  const u2 = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - delta},${lat - delta},${lng + delta},${lat + delta}&layer=mapnik&marker=${lat},${lng}`;
+  const u3 = `https://maps.google.com/maps?q=${lat},${lng}&z=${z}&t=k&output=embed`;
+  [u1, u2, u3].forEach((url, i) => {
+    if (url !== m3Urls[i]) {
+      m3Urls[i] = url;
+      const fr = document.getElementById(['mfr1', 'mfr2', 'mfr3'][i]);
+      if (fr) { fr.src = url; fr.style.display = 'block'; }
+    }
+  });
+}
+
+function setView(n, btn) {
+  document.querySelectorAll('.vbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const grid = document.getElementById('m3Grid');
+  const w1 = document.getElementById('mw1'), w2 = document.getElementById('mw2'), w3 = document.getElementById('mw3');
+  if (n === 1) { grid.className = 'map3-grid'; w1.style.display = 'block'; w2.style.display = 'none'; w3.style.display = 'none'; document.getElementById('mfr1').style.height = '400px'; }
+  else if (n === 2) { grid.className = 'map3-grid split2'; w1.style.display = 'block'; w2.style.display = 'block'; w3.style.display = 'none'; document.getElementById('mfr1').style.height = '220px'; document.getElementById('mfr2').style.height = '220px'; }
+  else { grid.className = 'map3-grid split3'; w1.style.display = 'block'; w2.style.display = 'block'; w3.style.display = 'block'; document.getElementById('mfr1').style.height = '170px'; document.getElementById('mfr2').style.height = '170px'; document.getElementById('mfr3').style.height = '170px'; }
+}
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+document.getElementById('sndBtn').onclick = function() {
+  soundOn = !soundOn;
+  this.textContent = soundOn ? '🔊' : '🔇';
+  localStorage.setItem('gps_sound_on_instant', soundOn);
+  if (!soundOn && alarmActive) stopAlarmMP3();
+  else if (soundOn && currentWeakState && useCustomMP3) startAlarmMP3();
+  lg1('if', soundOn ? 'Suara ON' : 'Suara OFF');
+};
+
+function ts() { const d = new Date(); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => x.toString().padStart(2, '0')).join(':'); }
+function _log(boxId, cls, msg) { const box = document.getElementById(boxId); if (!box) return; const el = document.createElement('div'); el.className = 'le'; el.innerHTML = '<span class="lt">[' + ts() + ']</span><span class="' + cls + '">' + msg + '</span>'; box.insertBefore(el, box.firstChild); if (box.children.length > 40) box.removeChild(box.lastChild); }
+function lg1(c, m) { _log('log1', c, m); }
+function lg2(c, m) { _log('log2', c, m); }
+function lg3(c, m) { _log('log3', c, m); }
+
+loadPersistedData();
+renderLostLog();
+lg1('if', '✅ GPS PRO - SEMUA MP3 BISA | Upload file MP3 apapun, pasti diterima!');
+</script>
+</body>
+</html>
